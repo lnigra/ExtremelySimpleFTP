@@ -40,6 +40,10 @@
 #include <sys/signal.h>
 #include <string.h>
 
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #define ENDMINITERM 2 /* ctrl-b to quit miniterm */
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -58,8 +62,8 @@ void child_handler(int s)
 main(argc,argv)
 int argc; char *argv[];
 {
-  char port[10];
-  int c, fd;
+  char port[20];
+  int c, fd, err;
   int speed;
   struct termios oldstdtio,newstdtio,oldtio,newtio;
   struct sigaction sa;
@@ -71,7 +75,7 @@ int argc; char *argv[];
       exit(1);
     }
   strcpy(port,argv[1]);
-  sscanf(argv[2],"%ld",&speed);
+  sscanf(argv[2],"%ld",(long int *)&speed);
 /* 
    Open modem device for reading and writing and not as controlling tty
    because we don't want to get killed if linenoise sends CTRL-C.
@@ -142,14 +146,14 @@ int argc; char *argv[];
   Strange, but if you uncomment this command miniterm will not work
   even if you stop canonical mode for stdout. This is a linux bug.
 */
-  tcsetattr(1,TCSANOW,&newtio); /* stdout settings like modem settings */
+  //tcsetattr(1,TCSANOW,&newtio); /* stdout settings like modem settings */
  
 /* next stop echo and buffering for stdin */
   tcgetattr(0,&oldstdtio);
   tcgetattr(0,&newstdtio); /* get working stdtio */
   newstdtio.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(0,TCSANOW,&newstdtio);
-  printf("Starting miniterm with %s at %ld baud.\r\n",port,speed);
+  printf("Starting miniterm with %s at %ld baud.\r\n",port,(long int)speed);
   printf("Exit with ctrl-B then \"stty sane\".\r\n");
 /* terminal settings done, now handle in/ouput */
   switch (fork())
@@ -157,7 +161,7 @@ int argc; char *argv[];
     case 0: /* child */
       /* user input */
       close(1); /* stdout not needed */
-      for (c=getchar(); c!= ENDMINITERM ; c=getchar()) write(fd,&c,1);
+      for (c=getchar(); c!= ENDMINITERM ; c=getchar()) err = write(fd,&c,1);
       tcsetattr(fd,TCSANOW,&oldtio); /* restore old modem setings */
       tcsetattr(0,TCSANOW,&oldstdtio); /* restore old tty setings */
       close(fd);
@@ -175,8 +179,8 @@ int argc; char *argv[];
       sigaction(SIGCHLD,&sa,NULL); /* handle dying child */
       while (STOP==FALSE) /* modem input handler */
 	{
-	  read(fd,&c,1); /* modem */
-	  write(1,&c,1); /* stdout */
+	  err = read(fd,&c,1); /* modem */
+	  err = write(1,&c,1); /* stdout */
 	}
       wait(NULL); /* wait for child to die or it will become a zombie */
       tcsetattr(fd,TCSANOW,&oldtio);
