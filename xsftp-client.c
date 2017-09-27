@@ -59,7 +59,7 @@ void child_handler(int s)
    STOP=TRUE;
 }
 
-main(argc,argv)
+int main(argc,argv)
 int argc; char *argv[];
 {
   char port[20];
